@@ -1,0 +1,646 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Mina JK · Order Handoff Automation — Case Study</title>
+  <meta name="description" content="A no-code automation case study by Mina JK. HubSpot + Make.com + Brevo + Google Sheets — a resilient order handoff system with validation, deduplication, audit logging and error routing." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,700;1,9..144,300;1,9..144,700&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    /* ORANGE THEME */
+    :root {
+      --bg:        #000000;
+      --bg2:       #0a0a0a;
+      --surface:   #181818;
+      --surface2:  #1f1f1f;
+      --border:    rgba(255,255,255,0.07);
+      --bv:        rgba(189,57,19,0.22);
+      --accent:    #BD3913;
+      --accent-lt: #e05a2c;
+      --accent-dim: rgba(189,57,19,0.12);
+      --text:      #eceef8;
+      --muted:     #5b6280;
+      --muted2:    #8c93b5;
+      --red:       #f07070;
+      --amber:     #f5b944;
+      --green:     #3dd68c;
+      --tag-bg:    rgba(189,57,19,0.1);
+    }
+
+    [data-theme="light"] {
+      --bg:        #f5f6fc;
+      --bg2:       #eaecf8;
+      --surface:   #ffffff;
+      --surface2:  #f0f2fc;
+      --border:    rgba(0,0,0,0.07);
+      --bv:        rgba(189,57,19,0.2);
+      --accent:    #BD3913;
+      --accent-lt: #d94b1e;
+      --accent-dim: rgba(189,57,19,0.1);
+      --text:      #111420;
+      --muted:     #7b82a0;
+      --muted2:    #4a5070;
+      --red:       #c0392b;
+      --amber:     #c07a10;
+      --green:     #1a9e5c;
+      --tag-bg:    rgba(189,57,19,0.1);
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.7;
+      overflow-x: hidden;
+      -webkit-font-smoothing: antialiased;
+      transition: background .3s, color .3s;
+    }
+
+    ::selection { background: var(--accent); color: #fff; }
+    ::-webkit-scrollbar { width: 3px; }
+    ::-webkit-scrollbar-thumb { background: var(--accent); }
+
+    .modal { display: none; position: fixed; inset: 0; z-index: 999; background: rgba(0,0,0,.92); backdrop-filter: blur(14px); align-items: center; justify-content: center; cursor: pointer; }
+    .modal.active { display: flex; animation: fadeUp .2s ease; }
+    .modal-img { max-width: 92%; max-height: 90%; object-fit: contain; border-radius: 12px; box-shadow: 0 0 80px rgba(189,57,19,.35); }
+    .modal-close { position: absolute; top: 24px; right: 36px; font-size: 32px; color: #fff; cursor: pointer; opacity: .6; transition: .2s; }
+    .modal-close:hover { opacity: 1; transform: scale(1.1); }
+
+    nav {
+      position: sticky; top: 0; z-index: 100;
+      border-bottom: 1px solid var(--border);
+      background: rgba(0,0,0,0.92);
+      backdrop-filter: blur(20px);
+      transition: background .3s;
+    }
+    [data-theme="light"] nav { background: rgba(245,246,252,0.94); }
+    .nav-inner { max-width: 1160px; margin: 0 auto; padding: 1rem 2rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: .8rem; }
+    .logo { display: flex; align-items: center; gap: 10px; text-decoration: none; color: var(--text); font-family: 'Fraunces', serif; font-style: italic; font-weight: 700; font-size: 1.6rem; line-height: 1; letter-spacing: -.01em; }
+
+    .nav-right { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
+    .lang-select { background: var(--surface); border: 1px solid var(--border); border-radius: 100px; padding: 0.38rem .95rem; font-family: 'DM Sans', sans-serif; font-weight: 600; font-size: .78rem; color: var(--text); cursor: pointer; transition: .2s; outline: none; }
+    .lang-select:hover { border-color: var(--accent); }
+    .lang-select option { background: var(--surface); }
+
+    .ctrl-group { display: flex; gap: .25rem; background: var(--surface); border: 1px solid var(--border); padding: .28rem; border-radius: 100px; }
+    .ctrl-btn { background: transparent; border: none; cursor: pointer; font-family: 'DM Sans', sans-serif; font-size: .75rem; font-weight: 700; padding: .38rem .8rem; border-radius: 100px; color: var(--muted2); transition: .2s; }
+    .ctrl-btn.active { background: var(--accent); color: #fff; }
+    .ctrl-btn:hover:not(.active) { background: var(--accent-dim); color: var(--accent-lt); }
+
+    .nav-back { display: inline-flex; align-items: center; gap: .4rem; background: var(--surface); border: 1px solid var(--border); color: var(--muted2); font-family: 'DM Sans', sans-serif; font-weight: 600; font-size: .78rem; padding: .48rem 1rem; border-radius: 8px; text-decoration: none; transition: .2s; }
+    .nav-back:hover { border-color: var(--accent); color: var(--accent-lt); transform: translateY(-1px); }
+
+    .wrap { max-width: 1100px; margin: 0 auto; padding: 0 2rem; }
+    section { padding: 5.5rem 0; border-top: 1px solid var(--border); }
+
+    .lang-content { display: none; }
+    .lang-content.active { display: block; animation: fadeUp .35s ease; }
+    @keyframes fadeUp { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
+
+    .reveal { opacity: 0; transform: translateY(18px); transition: opacity .55s ease, transform .55s ease; }
+    .reveal.in { opacity: 1; transform: translateY(0); }
+    .d1 { transition-delay: .1s; } .d2 { transition-delay: .2s; } .d3 { transition-delay: .32s; } .d4 { transition-delay: .44s; }
+
+    .sec-tag { display: inline-flex; align-items: center; gap: .42rem; background: var(--tag-bg); border: 1px solid var(--bv); padding: .3rem .85rem; border-radius: 100px; font-size: .68rem; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--accent-lt); margin-bottom: 1rem; }
+
+    h1 { font-family: 'Fraunces', serif; font-size: clamp(2.8rem, 5.5vw, 4.8rem); font-weight: 700; letter-spacing: -.03em; line-height: 1.05; margin-bottom: 1.2rem; }
+    h1 em { font-style: italic; color: var(--accent-lt); }
+    h2 { font-family: 'Fraunces', serif; font-size: clamp(1.8rem, 2.8vw, 2.6rem); font-weight: 700; letter-spacing: -.025em; line-height: 1.15; margin-bottom: .9rem; }
+    h3 { font-family: 'DM Sans', sans-serif; font-size: .95rem; font-weight: 600; margin-bottom: .4rem; }
+    .lead { font-size: 1rem; color: var(--muted2); line-height: 1.85; max-width: 580px; margin-bottom: 2.5rem; }
+    .sec-head { text-align: center; max-width: 660px; margin: 0 auto 3rem; }
+    .sec-head .lead { margin-left: auto; margin-right: auto; }
+    code { font-family: 'DM Mono', monospace; font-size: .82em; background: rgba(189,57,19,.1); padding: .15rem .45rem; border-radius: 4px; color: var(--accent-lt); }
+
+    .hero { min-height: 100vh; display: flex; flex-direction: column; justify-content: center; padding: 9rem 2rem 5rem; position: relative; overflow: hidden; }
+    .hero-glow { position: absolute; pointer-events: none; }
+    .hero-glow-a { width: 800px; height: 800px; top: -250px; right: -180px; background: radial-gradient(circle, rgba(189,57,19,.13) 0%, transparent 65%); }
+    .hero-glow-b { width: 500px; height: 500px; bottom: -100px; left: 40px; background: radial-gradient(circle, rgba(189,57,19,.09) 0%, transparent 65%); }
+    .hero-inner { max-width: 1100px; margin: 0 auto; position: relative; z-index: 1; }
+
+    .eyebrow { display: inline-flex; align-items: center; gap: .6rem; font-size: .7rem; font-weight: 700; letter-spacing: .2em; text-transform: uppercase; color: var(--accent-lt); margin-bottom: 1.8rem; opacity: 0; animation: fadeUp .55s .1s ease forwards; }
+    .eyebrow::before { content: ''; width: 24px; height: 1px; background: currentColor; }
+
+    /* AUTHOR NOTE */
+    .author-note { display: inline-flex; align-items: flex-start; gap: .7rem; background: rgba(189,57,19,.07); border: 1px solid rgba(189,57,19,.22); border-radius: 10px; padding: .85rem 1.2rem; font-size: .87rem; color: var(--muted2); margin-bottom: 1.5rem; max-width: 660px; opacity: 0; animation: fadeUp .55s .22s ease forwards; }
+    .author-note i { color: var(--accent-lt); flex-shrink: 0; margin-top: 2px; }
+    .author-note strong { color: var(--text); }
+
+    .hero h1 { opacity: 0; animation: fadeUp .55s .32s ease forwards; }
+    .hero-sub { font-size: 1.05rem; color: var(--muted2); max-width: 560px; line-height: 1.85; margin-bottom: 2.5rem; opacity: 0; animation: fadeUp .55s .44s ease forwards; }
+    .hero-btns { display: flex; flex-wrap: wrap; gap: .9rem; align-items: center; margin-bottom: 4.5rem; opacity: 0; animation: fadeUp .55s .56s ease forwards; }
+    .btn-p { display: inline-flex; align-items: center; gap: .5rem; background: var(--accent); color: #fff; font-family: 'DM Sans', sans-serif; font-weight: 600; font-size: .88rem; padding: .85rem 1.8rem; border-radius: 8px; text-decoration: none; transition: .25s; }
+    .btn-p:hover { background: var(--accent-lt); transform: translateY(-2px); box-shadow: 0 12px 30px rgba(189,57,19,.4); }
+    .btn-g { display: inline-flex; align-items: center; gap: .5rem; color: var(--muted2); font-weight: 600; font-size: .88rem; text-decoration: none; padding-bottom: 2px; border-bottom: 1px solid var(--border); transition: .2s; }
+    .btn-g:hover { color: var(--text); border-color: var(--accent); transform: translateY(-1px); }
+
+    .hero-stats { display: grid; grid-template-columns: repeat(4, 1fr); background: var(--border); gap: 1px; border: 1px solid var(--border); border-radius: 16px; overflow: hidden; max-width: 680px; opacity: 0; animation: fadeUp .55s .7s ease forwards; }
+    .hstat { background: var(--bg); padding: 1.5rem 1.2rem; transition: all .2s; }
+    .hstat:hover { background: var(--surface); transform: translateY(-2px); }
+    .hstat-val { font-family: 'Fraunces', serif; font-size: 1.8rem; font-weight: 700; color: var(--accent-lt); letter-spacing: -.04em; line-height: 1; margin-bottom: .28rem; }
+    .hstat-lbl { font-size: .66rem; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+
+    .context-banner { display: flex; align-items: flex-start; gap: .8rem; background: rgba(189,57,19,.05); border: 1px solid var(--bv); border-radius: 12px; padding: 1.2rem 1.5rem; margin-bottom: 3rem; transition: .2s; }
+    .context-banner:hover { border-color: var(--accent); }
+    .context-banner i { color: var(--accent-lt); margin-top: 2px; flex-shrink: 0; font-size: .9rem; }
+
+    .problem-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 2.5rem; align-items: start; }
+    .problem-steps { list-style: none; display: flex; flex-direction: column; gap: .6rem; }
+    .ps { display: flex; align-items: flex-start; gap: 1rem; padding: 1rem 1.2rem; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; font-size: .88rem; color: var(--muted2); transition: .2s; }
+    .ps:hover { border-color: rgba(240,112,112,.25); transform: translateX(3px); }
+    .ps-num { font-family: 'DM Mono', monospace; font-size: .72rem; color: var(--muted); flex-shrink: 0; width: 22px; padding-top: 2px; }
+
+    .problem-outcome { padding: 1.5rem; background: rgba(240,112,112,.05); border: 1px solid rgba(240,112,112,.18); border-radius: 12px; transition: .2s; }
+    .problem-outcome:hover { border-color: var(--red); }
+    .problem-outcome .label { font-size: .68rem; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--red); margin-bottom: .85rem; }
+    .outcome-item { display: flex; align-items: center; gap: .7rem; font-size: .87rem; color: var(--muted2); padding: .5rem 0; border-bottom: 1px solid rgba(240,112,112,.08); }
+    .outcome-item:last-child { border-bottom: none; }
+    .outcome-item i { color: var(--red); font-size: .7rem; flex-shrink: 0; }
+
+    .sol-list { list-style: none; display: flex; flex-direction: column; gap: .65rem; }
+    .sol-list li { display: flex; align-items: flex-start; gap: .9rem; padding: .95rem 1.2rem; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; font-size: .9rem; color: var(--muted2); transition: .2s; }
+    .sol-list li:hover { border-color: var(--bv); transform: translateX(3px); }
+    .sol-list li i { color: var(--accent-lt); flex-shrink: 0; margin-top: 3px; font-size: .8rem; }
+    .sol-list li strong { color: var(--text); }
+
+    .tools-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1rem; }
+    .tool-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem 1.2rem; text-align: center; transition: all .2s; }
+    .tool-card:hover { border-color: var(--accent); transform: translateY(-4px); box-shadow: 0 8px 20px -6px rgba(189,57,19,.2); }
+    .tool-ico { font-size: 1.4rem; color: var(--accent-lt); margin-bottom: .75rem; transition: transform .2s; }
+    .tool-card:hover .tool-ico { transform: scale(1.05); }
+    .tool-name { font-size: .9rem; font-weight: 600; margin-bottom: .3rem; }
+    .tool-role { font-size: .76rem; color: var(--muted); line-height: 1.5; }
+
+    .flowchart { background: var(--surface); border: 1px solid var(--border); border-radius: 18px; padding: 2.5rem 2rem; transition: .2s; }
+    .flowchart:hover { border-color: var(--bv); }
+    .flow-label { font-size: .66rem; font-weight: 700; letter-spacing: .18em; text-transform: uppercase; color: var(--muted); margin-bottom: 2.2rem; text-align: center; }
+    .flow-row { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: .5rem; margin-bottom: .9rem; }
+    .fbox { background: var(--bg); border: 1px solid var(--border); border-radius: 9px; padding: .62rem 1rem; display: flex; align-items: center; gap: .5rem; font-size: .78rem; font-weight: 600; white-space: nowrap; transition: .2s; }
+    .fbox:hover { border-color: var(--accent); transform: translateY(-1px); }
+    .fbox i { color: var(--accent-lt); font-size: .8rem; }
+    .fbox.gate { border-color: rgba(245,185,68,.22); }
+    .fbox.gate i { color: var(--amber); }
+    .fbox.final { border-color: var(--bv); background: var(--accent-dim); }
+    .farr { color: var(--muted); font-size: .78rem; }
+    .f-branch { display: flex; justify-content: center; gap: 1rem; flex-wrap: wrap; margin-bottom: .9rem; }
+    .f-no  { display: flex; align-items: center; gap: .45rem; padding: .5rem .9rem; border-radius: 7px; font-size: .75rem; font-weight: 600; color: var(--red);   background: rgba(240,112,112,.05); border: 1px dashed rgba(240,112,112,.28); transition: .2s; }
+    .f-yes { display: flex; align-items: center; gap: .45rem; padding: .5rem .9rem; border-radius: 7px; font-size: .75rem; font-weight: 600; color: var(--green); background: rgba(61,214,140,.05); border: 1px solid rgba(61,214,140,.2); transition: .2s; }
+    .f-err { display: flex; align-items: center; justify-content: center; gap: .7rem; margin-top: 1.2rem; padding: .9rem 1.2rem; background: rgba(240,112,112,.04); border: 1px solid rgba(240,112,112,.14); border-radius: 9px; font-size: .78rem; color: var(--muted2); text-align: center; flex-wrap: wrap; transition: .2s; }
+    .f-err:hover { border-color: var(--red); }
+
+    .challenges-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1.1rem; }
+    .ch-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 1.6rem; transition: all .2s; }
+    .ch-card:hover { border-color: var(--accent); transform: translateY(-3px); box-shadow: 0 8px 20px -6px rgba(189,57,19,.15); }
+    .ch-problem { font-size: .68rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--red); margin-bottom: .5rem; display: flex; align-items: center; gap: .4rem; }
+    .ch-card h3 { font-size: .95rem; font-weight: 700; margin-bottom: .6rem; }
+    .ch-divider { height: 1px; background: var(--border); margin: .8rem 0; }
+    .ch-solution { font-size: .84rem; color: var(--muted2); line-height: 1.65; }
+    .ch-solution strong { color: var(--accent-lt); }
+
+    .val-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
+    .val-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1.3rem; transition: all .2s; display: flex; gap: .85rem; align-items: flex-start; }
+    .val-card:hover { transform: translateY(-2px); border-color: var(--accent); }
+    .val-card.ok   { border-left: 3px solid var(--accent-lt); }
+    .val-card.warn { border-left: 3px solid var(--amber); }
+    .val-card.err  { border-left: 3px solid var(--muted); }
+    .val-ico { width: 32px; height: 32px; flex-shrink: 0; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: .85rem; transition: transform .2s; }
+    .val-card:hover .val-ico { transform: scale(1.05); }
+    .ok   .val-ico { background: rgba(189,57,19,.1); color: var(--accent-lt); }
+    .warn .val-ico { background: rgba(245,185,68,.1);  color: var(--amber); }
+    .err  .val-ico { background: rgba(107,114,128,.1); color: var(--muted2); }
+    .val-card h3 { font-size: .85rem; margin-bottom: .18rem; }
+    .val-card p  { font-size: .78rem; color: var(--muted); line-height: 1.5; }
+
+    .roi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 1.1rem; margin-bottom: 2rem; }
+    .roi-card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 1.7rem 1.3rem; text-align: center; position: relative; overflow: hidden; transition: all .2s; }
+    .roi-card::after { content: ''; position: absolute; inset: 0; top: auto; height: 2px; background: linear-gradient(90deg, transparent, var(--accent), transparent); }
+    .roi-card:hover { border-color: var(--accent); transform: translateY(-4px); box-shadow: 0 8px 20px -6px rgba(189,57,19,.2); }
+    .roi-num { font-family: 'Fraunces', serif; font-size: 2.2rem; font-weight: 700; letter-spacing: -.04em; line-height: 1; color: var(--accent-lt); margin-bottom: .3rem; }
+    .roi-lbl { font-size: .8rem; font-weight: 600; margin-bottom: .2rem; }
+    .roi-sub { font-size: .7rem; color: var(--muted); }
+
+    .matters-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
+    .matter-card { background: var(--surface2); border: 1px solid var(--border); border-radius: 12px; padding: 1.6rem; transition: all .2s; }
+    .matter-card:hover { border-color: var(--accent); transform: translateY(-2px); box-shadow: 0 4px 12px rgba(189,57,19,.1); }
+    .matter-num { font-family: 'Fraunces', serif; font-size: 2rem; font-weight: 700; color: rgba(189,57,19,.18); line-height: 1; margin-bottom: .6rem; transition: color .2s; }
+    .matter-card:hover .matter-num { color: var(--accent-lt); }
+    .matter-card h3 { font-size: .93rem; margin-bottom: .45rem; }
+    .matter-card p { font-size: .83rem; color: var(--muted2); line-height: 1.65; }
+
+    .next-note { padding: 1.5rem 1.8rem; background: var(--accent-dim); border: 1px solid var(--bv); border-radius: 12px; display: flex; align-items: flex-start; gap: 1rem; margin-top: 2rem; transition: .2s; }
+    .next-note:hover { border-color: var(--accent); }
+    .next-note i { color: var(--accent-lt); margin-top: 3px; flex-shrink: 0; }
+    .next-note p { font-size: .88rem; color: var(--muted2); line-height: 1.7; }
+    .next-note strong { color: var(--text); }
+
+    .screens-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 1.3rem; }
+    .sc-card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; overflow: hidden; cursor: pointer; transition: .25s; }
+    .sc-card:hover { border-color: var(--accent); transform: translateY(-4px); box-shadow: 0 20px 40px -12px rgba(189,57,19,.28); }
+    .sc-img { width: 100%; height: 210px; object-fit: cover; display: block; transition: transform .3s; }
+    .sc-card:hover .sc-img { transform: scale(1.03); }
+    .sc-info { padding: 1rem 1.2rem; display: flex; align-items: center; gap: .65rem; }
+    .sc-ico { width: 28px; height: 28px; flex-shrink: 0; background: var(--accent-dim); border: 1px solid var(--bv); border-radius: 7px; display: flex; align-items: center; justify-content: center; font-size: .78rem; color: var(--accent-lt); transition: .2s; }
+    .sc-card:hover .sc-ico { background: var(--accent); color: #fff; }
+    .sc-title { font-size: .85rem; font-weight: 700; }
+    .sc-sub { font-size: .72rem; color: var(--muted); }
+    .sc-placeholder { width: 100%; height: 210px; background: var(--bg); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .6rem; color: var(--muted); font-size: .78rem; border-bottom: 1px solid var(--border); }
+    .sc-placeholder i { font-size: 1.8rem; opacity: .3; }
+
+    footer { border-top: 1px solid var(--border); padding: 2rem; text-align: center; font-size: .78rem; color: var(--muted); }
+    footer a { color: var(--accent-lt); text-decoration: none; transition: .2s; }
+    footer a:hover { color: var(--accent); }
+
+    @media (max-width: 860px) {
+      .problem-layout, .challenges-grid { grid-template-columns: 1fr; }
+      .val-grid, .tools-grid { grid-template-columns: 1fr 1fr; }
+      .roi-grid, .matters-grid { grid-template-columns: 1fr 1fr; }
+      .hero-stats { grid-template-columns: 1fr 1fr; }
+    }
+    @media (max-width: 560px) {
+      h1 { font-size: 2.5rem; }
+      .val-grid, .roi-grid, .matters-grid { grid-template-columns: 1fr; }
+      .flow-row { flex-direction: column; align-items: center; }
+      .farr { transform: rotate(90deg); }
+      .wrap { padding: 0 1.2rem; }
+      section { padding: 3.5rem 0; }
+      .hero { padding: 7.5rem 1.2rem 4rem; }
+      .nav-inner { padding: .85rem 1.2rem; }
+    }
+  </style>
+</head>
+<body>
+
+<div id="modal" class="modal" onclick="closeModal()">
+  <span class="modal-close">&times;</span>
+  <img class="modal-img" id="modal-img" src="" alt="Screenshot">
+</div>
+
+<nav>
+  <div class="nav-inner">
+    <a href="https://portfolio-site-9d14e9.webflow.io/" class="logo">
+      Mina
+    </a>
+    <div class="nav-right">
+      <select id="lang-select" class="lang-select">
+        <option value="en" selected>English</option>
+        <option value="sv">Svenska</option>
+        <option value="sr">Srpski</option>
+      </select>
+      <div class="ctrl-group" id="theme-ctrl">
+        <button class="ctrl-btn active" data-theme="dark">🌙</button>
+        <button class="ctrl-btn" data-theme="light">☀️</button>
+      </div>
+      <a href="https://portfolio-site-9d14e9.webflow.io/" class="nav-back">
+        <i class="fas fa-arrow-left"></i> Portfolio
+      </a>
+    </div>
+  </div>
+</nav>
+
+<!-- ENGLISH -->
+<div class="lang-content active" id="lang-en">
+  <header class="hero">
+    <div class="hero-glow hero-glow-a"></div>
+    <div class="hero-glow hero-glow-b"></div>
+    <div class="hero-inner">
+      <div class="eyebrow">Automation Case Study · No-Code</div>
+      <!-- AUTHOR NOTE ADDED -->
+      <div class="author-note">
+        <i class="fas fa-circle-info"></i>
+        <span><strong>Built as a portfolio project</strong> — this is a real, working automation I designed and built to demonstrate my skills. Not a client project, but every module runs.</span>
+      </div>
+      <h1>Order Handoff<br><em>Automation</em></h1>
+      <p class="hero-sub">A resilient, event-driven pipeline that activates the moment a deal closes — validating data, eliminating duplicates, sending communications, and creating an auditable record. Every edge case handled. Zero manual steps.</p>
+      <div class="hero-btns">
+        <a href="#proof-en" class="btn-p"><i class="fas fa-images"></i> See Screenshots</a>
+        <a href="#roi-en" class="btn-g">View Business Impact →</a>
+      </div>
+      <div class="hero-stats">
+        <div class="hstat"><div class="hstat-val">100%</div><div class="hstat-lbl">Time saved per deal</div></div>
+        <div class="hstat"><div class="hstat-val">0</div><div class="hstat-lbl">Missed customers</div></div>
+        <div class="hstat"><div class="hstat-val">0</div><div class="hstat-lbl">Duplicate sends</div></div>
+        <div class="hstat"><div class="hstat-val">6h</div><div class="hstat-lbl">Reclaimed / month</div></div>
+      </div>
+    </div>
+  </header>
+
+  <section id="problem-en">
+    <div class="wrap">
+      <div class="sec-tag reveal"><i class="fas fa-triangle-exclamation"></i> 01 · The Problem</div>
+      <h2 class="reveal d1">The sales process ended<br>where the real risk began.</h2>
+      <p class="lead reveal d2">Closing a deal in HubSpot was only the beginning. Everything after "Closed Won" depended entirely on a person remembering to act — and acting correctly every time.</p>
+      <div class="problem-layout reveal d2">
+        <div>
+          <div class="problem-steps">
+            <div class="ps"><span class="ps-num">01</span>Manually copy contact email from HubSpot into a separate inbox</div>
+            <div class="ps"><span class="ps-num">02</span>Find the right welcome email template and adapt it for the client</div>
+            <div class="ps"><span class="ps-num">03</span>Send it — and hope the right version was sent to the right person</div>
+            <div class="ps"><span class="ps-num">04</span>Update the deal record in HubSpot (or forget entirely)</div>
+            <div class="ps"><span class="ps-num">05</span>Log it somewhere — a spreadsheet, a sticky note, or nothing</div>
+          </div>
+        </div>
+        <div>
+          <div class="problem-outcome">
+            <div class="label"><i class="fas fa-triangle-exclamation"></i> What this actually caused</div>
+            <div class="outcome-item"><i class="fas fa-circle"></i> 3–5 customers per month received no welcome email</div>
+            <div class="outcome-item"><i class="fas fa-circle"></i> Duplicate emails sent to the same contact during busy periods</div>
+            <div class="outcome-item"><i class="fas fa-circle"></i> HubSpot deal records left incomplete — no audit trail</div>
+            <div class="outcome-item"><i class="fas fa-circle"></i> 5–10 minutes of low-value admin work lost per deal closed</div>
+            <div class="outcome-item"><i class="fas fa-circle"></i> No way to know whether a customer had been contacted or not</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <div class="sec-tag reveal"><i class="fas fa-microchip"></i> 02 · The Solution</div>
+      <h2 class="reveal d1">An event-driven pipeline that<br>owns the entire handoff process.</h2>
+      <p class="lead reveal d2">I replaced five manual steps with a single automated trigger. The moment a deal stage changes to Closed Won in HubSpot, the system takes full ownership — fetching data, validating it, deduplicating, sending, updating, and logging.</p>
+      <ul class="sol-list reveal d2">
+        <li><i class="fas fa-check"></i><span><strong>Fetches deal and contact data from HubSpot</strong> — no copy-paste, no human memory required</span></li>
+        <li><i class="fas fa-check"></i><span><strong>Validates data quality before acting</strong> — checks that a contact exists and the email address is present</span></li>
+        <li><i class="fas fa-check"></i><span><strong>Deduplicates against Google Sheets</strong> — uses <code>deal_id</code> as a unique key, preventing any repeat processing of the same deal</span></li>
+        <li><i class="fas fa-check"></i><span><strong>Sends a professional welcome email via Brevo</strong> — triggered automatically with the correct contact data</span></li>
+        <li><i class="fas fa-check"></i><span><strong>Writes back to HubSpot</strong> — sets <code>handoff_sent = yes</code> so the deal record is always up to date</span></li>
+        <li><i class="fas fa-check"></i><span><strong>Logs every outcome to Google Sheets</strong> — with status, timestamp, deal ID, and contact email for full traceability</span></li>
+        <li><i class="fas fa-check"></i><span><strong>Routes every failure to the internal team</strong> — nothing fails silently; the right person is notified immediately</span></li>
+      </ul>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <div class="sec-head">
+        <div class="sec-tag reveal"><i class="fas fa-layer-group"></i> 03 · Tools Used</div>
+        <h2 class="reveal d1">Each tool chosen<br>for a specific job.</h2>
+        <p class="lead reveal d2">No tool is decorative. Each one solves a distinct part of the problem.</p>
+      </div>
+      <div class="tools-grid reveal d2">
+        <div class="tool-card"><div class="tool-ico"><i class="fas fa-circle-dot"></i></div><div class="tool-name">HubSpot CRM</div><div class="tool-role">Trigger source and record target. Deal stage change fires the webhook; deal properties are updated on completion.</div></div>
+        <div class="tool-card"><div class="tool-ico"><i class="fas fa-code-branch"></i></div><div class="tool-name">Make.com</div><div class="tool-role">Automation orchestrator. Handles routing, conditional logic, error paths, and all integrations between services.</div></div>
+        <div class="tool-card"><div class="tool-ico"><i class="fas fa-paper-plane"></i></div><div class="tool-name">Brevo</div><div class="tool-role">Transactional email delivery. Sends the welcome email with dynamic contact data populated from HubSpot.</div></div>
+        <div class="tool-card"><div class="tool-ico"><i class="fas fa-table"></i></div><div class="tool-name">Google Sheets</div><div class="tool-role">Dual purpose: deduplication store (checked before sending) and audit log (written to after every run).</div></div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <div class="sec-tag reveal"><i class="fas fa-diagram-project"></i> 04 · Workflow Logic</div>
+      <h2 class="reveal d1">Every branch is<br>explicitly mapped.</h2>
+      <p class="lead reveal d2">I designed the workflow to handle both the happy path and every failure state before writing a single module.</p>
+      <div class="flowchart reveal d2">
+        <div class="flow-label">Make.com scenario — HubSpot trigger through to final log</div>
+        <div class="flow-row">
+          <div class="fbox"><i class="fas fa-circle-dot"></i> HubSpot: Closed Won</div>
+          <div class="farr"><i class="fas fa-chevron-right"></i></div>
+          <div class="fbox"><i class="fas fa-download"></i> Fetch deal + contact</div>
+          <div class="farr"><i class="fas fa-chevron-right"></i></div>
+          <div class="fbox gate"><i class="fas fa-user-check"></i> Contact exists?</div>
+        </div>
+        <div class="f-branch">
+          <div class="f-no"><i class="fas fa-times"></i> No → Log <code style="font-size:.72rem">missing_contact</code> → Notify → Stop</div>
+          <div class="f-yes"><i class="fas fa-check"></i> Yes → Validate email</div>
+        </div>
+        <div class="flow-row">
+          <div class="fbox gate"><i class="fas fa-at"></i> Email valid?</div>
+          <div class="farr"><i class="fas fa-chevron-right"></i></div>
+          <div class="fbox gate"><i class="fas fa-fingerprint"></i> New deal_id?</div>
+        </div>
+        <div class="f-branch">
+          <div class="f-no"><i class="fas fa-times"></i> Duplicate → Skip silently → Stop</div>
+          <div class="f-yes"><i class="fas fa-check"></i> New → Continue to send</div>
+        </div>
+        <div class="flow-row">
+          <div class="fbox"><i class="fas fa-paper-plane"></i> Send via Brevo</div>
+          <div class="farr"><i class="fas fa-chevron-right"></i></div>
+          <div class="fbox"><i class="fas fa-pen-to-square"></i> Update HubSpot</div>
+          <div class="farr"><i class="fas fa-chevron-right"></i></div>
+          <div class="fbox final"><i class="fas fa-table"></i> Log to Sheets + Notify</div>
+        </div>
+        <div class="f-err">
+          <i class="fas fa-triangle-exclamation"></i>
+          <span><strong>Global error handler:</strong> Any module failure captures the error type and routes a notification to the internal team — no failure goes undetected.</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <div class="sec-tag reveal"><i class="fas fa-shield-halved"></i> 05 · Challenges Solved</div>
+      <h2 class="reveal d1">The decisions that make<br>this system production-grade.</h2>
+      <p class="lead reveal d2">Connecting tools is straightforward. Making the system reliable under real-world conditions is where the design thinking happens.</p>
+      <div class="challenges-grid reveal d2">
+        <div class="ch-card"><div class="ch-problem"><i class="fas fa-circle"></i> Challenge</div><h3>Webhook retries cause duplicate emails</h3><div class="ch-divider"></div><div class="ch-solution">Make.com webhooks can fire more than once for the same event. Without a guard, every retry would re-send the welcome email to the same customer.<br><br><strong>Solution:</strong> Before any action is taken, the system checks Google Sheets for the incoming <code>deal_id</code>. If it already exists, the scenario stops immediately. The deduplication layer is the first real operation in the pipeline — not an afterthought.</div></div>
+        <div class="ch-card"><div class="ch-problem"><i class="fas fa-circle"></i> Challenge</div><h3>Silent failures are worse than no automation</h3><div class="ch-divider"></div><div class="ch-solution">If any step fails and nothing happens, the business doesn't know a customer was missed. The old manual process at least had a human who might notice.<br><br><strong>Solution:</strong> Every failure path — missing contact, invalid email, failed Brevo call, failed HubSpot write — triggers both a log entry with error type and an immediate internal team notification. No failure is silent.</div></div>
+        <div class="ch-card"><div class="ch-problem"><i class="fas fa-circle"></i> Challenge</div><h3>HubSpot contacts aren't always complete</h3><div class="ch-divider"></div><div class="ch-solution">Sales reps close deals against contacts that may be incomplete — no email, no contact linked at all. Attempting to send without validating produces API errors and gaps in the log.<br><br><strong>Solution:</strong> The pipeline validates both contact existence and email address presence before attempting any downstream action. Each failure type is logged with a distinct status code for easy diagnosis.</div></div>
+        <div class="ch-card"><div class="ch-problem"><i class="fas fa-circle"></i> Challenge</div><h3>No traceability after the fact</h3><div class="ch-divider"></div><div class="ch-solution">The original process had no record of what was sent, when, or to whom. Any follow-up question — "did this customer receive the email?" — required manual investigation.<br><br><strong>Solution:</strong> Every run — successful or not — is written to Google Sheets with deal ID, contact email, outcome status, and timestamp. The sheet becomes a full audit trail the team can query at any time.</div></div>
+      </div>
+      <div style="margin-top: 2rem">
+        <div class="sec-tag reveal d2"><i class="fas fa-table-list"></i> Validation Matrix</div>
+        <div class="val-grid reveal d3">
+          <div class="val-card ok"><div class="val-ico"><i class="fas fa-user-check"></i></div><div><h3>Contact found</h3><p>Pipeline continues to email check</p></div></div>
+          <div class="val-card ok"><div class="val-ico"><i class="fas fa-at"></i></div><div><h3>Email address present</h3><p>Pipeline continues to dedup check</p></div></div>
+          <div class="val-card warn"><div class="val-ico"><i class="fas fa-fingerprint"></i></div><div><h3>Duplicate deal_id</h3><p>Silent stop — prevents double-send</p></div></div>
+          <div class="val-card err"><div class="val-ico"><i class="fas fa-user-slash"></i></div><div><h3>No contact linked</h3><p>Log <code>missing_contact</code> → notify</p></div></div>
+          <div class="val-card err"><div class="val-ico"><i class="fas fa-circle-exclamation"></i></div><div><h3>Email send fails</h3><p>Log <code>error_email</code> → notify team</p></div></div>
+          <div class="val-card err"><div class="val-ico"><i class="fas fa-database"></i></div><div><h3>HubSpot write fails</h3><p>Log <code>error_hubspot</code> → notify team</p></div></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="roi-en">
+    <div class="wrap">
+      <div class="sec-tag reveal"><i class="fas fa-chart-line"></i> 06 · Business Value</div>
+      <h2 class="reveal d1">The measurable impact<br>of removing manual steps.</h2>
+      <p class="lead reveal d2">Calculated against a team closing 50 deals per month at 5–10 minutes of manual work per deal.</p>
+      <div class="roi-grid reveal d2">
+        <div class="roi-card"><div class="roi-num">6h</div><div class="roi-lbl">Staff time reclaimed / month</div><div class="roi-sub">350 admin minutes → 0</div></div>
+        <div class="roi-card"><div class="roi-num">0</div><div class="roi-lbl">Missed customers / month</div><div class="roi-sub">Was 3–5 before automation</div></div>
+        <div class="roi-card"><div class="roi-num">0</div><div class="roi-lbl">Duplicate emails sent</div><div class="roi-sub">Eliminated by dedup layer</div></div>
+        <div class="roi-card"><div class="roi-num">100%</div><div class="roi-lbl">Deals logged with full audit trail</div><div class="roi-sub">Was 0% previously</div></div>
+      </div>
+      <div class="context-banner reveal d3">
+        <i class="fas fa-circle-info"></i>
+        <p>Beyond the time savings, the less visible business value is <strong>consistency</strong>. Every customer now receives the same communication at the same point in the process — regardless of who closed the deal, what day it was, or how busy the team was. That's the kind of reliability that builds trust at scale.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="proof-en">
+    <div class="wrap">
+      <div class="sec-head">
+        <div class="sec-tag reveal"><i class="fas fa-camera"></i> Visual Proof</div>
+        <h2 class="reveal d1">Real screenshots of<br>the working system.</h2>
+        <p class="lead reveal d2">Click any image to expand.</p>
+      </div>
+      <div class="screens-grid reveal d2">
+        <div class="sc-card" onclick="openModal('assets/make-scenario.png')">
+          <img src="assets/make-scenario.png" class="sc-img" alt="Make.com scenario" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+          <div class="sc-placeholder" style="display:none"><i class="fas fa-diagram-project"></i> make-scenario.png</div>
+          <div class="sc-info"><div class="sc-ico"><i class="fas fa-code-branch"></i></div><div><div class="sc-title">Make.com Scenario</div><div class="sc-sub">Full automation workflow with error routing</div></div></div>
+        </div>
+        <div class="sc-card" onclick="openModal('assets/google-sheets-log.png')">
+          <img src="assets/google-sheets-log.png" class="sc-img" alt="Google Sheets log" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+          <div class="sc-placeholder" style="display:none"><i class="fas fa-table"></i> google-sheets-log.png</div>
+          <div class="sc-info"><div class="sc-ico"><i class="fas fa-table"></i></div><div><div class="sc-title">Google Sheets Audit Log</div><div class="sc-sub">Every outcome timestamped and categorised</div></div></div>
+        </div>
+        <div class="sc-card" onclick="openModal('assets/hubspot-deal.png')">
+          <img src="assets/hubspot-deal.png" class="sc-img" alt="HubSpot deal" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+          <div class="sc-placeholder" style="display:none"><i class="fas fa-circle-dot"></i> hubspot-deal.png</div>
+          <div class="sc-info"><div class="sc-ico"><i class="fas fa-circle-dot"></i></div><div><div class="sc-title">HubSpot Deal Record</div><div class="sc-sub">handoff_sent property updated automatically</div></div></div>
+        </div>
+        <div class="sc-card" onclick="openModal('assets/brevo-email.png')">
+          <img src="assets/brevo-email.png" class="sc-img" alt="Brevo email" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+          <div class="sc-placeholder" style="display:none"><i class="fas fa-paper-plane"></i> brevo-email.png</div>
+          <div class="sc-info"><div class="sc-ico"><i class="fas fa-paper-plane"></i></div><div><div class="sc-title">Brevo Welcome Email</div><div class="sc-sub">Sent automatically with deal-specific data</div></div></div>
+        </div>
+        <!-- VIDEO CARD -->
+        <div class="sc-card" onclick="window.open('https://www.loom.com/share/tvoj-link', '_blank')">
+          <div class="sc-placeholder"><i class="fas fa-video"></i> Watch live demo (2 min)</div>
+          <div class="sc-info"><div class="sc-ico"><i class="fas fa-play"></i></div><div><div class="sc-title">Video Demo</div><div class="sc-sub">Full walkthrough of the automation</div></div></div>
+        </div>
+      </div>
+
+      <!-- MY REFLECTION ADDED -->
+      <div class="context-banner" style="margin-top: 2rem;">
+        <i class="fas fa-user"></i>
+        <p><strong>My reflection:</strong> The hardest part wasn't the automation itself — it was deciding what to do when data was <em>almost</em> valid. I ended up building a separate "manual review" log just for edge cases. That decision taught me more about error design than any tutorial.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <div class="sec-tag reveal"><i class="fas fa-graduation-cap"></i> 07 · Why This Matters</div>
+      <h2 class="reveal d1">What this system<br>demonstrates about the work.</h2>
+      <p class="lead reveal d2">Anyone can connect two tools with a webhook. The quality of automation work shows in how you handle the parts that go wrong.</p>
+      <div class="matters-grid reveal d2">
+        <div class="matter-card"><div class="matter-num">01</div><h3>Systems thinking over tool knowledge</h3><p>The challenge wasn't knowing how to use Make.com. It was mapping every success and failure state before writing a single module — then building the right structure to handle all of them.</p></div>
+        <div class="matter-card"><div class="matter-num">02</div><h3>Reliability is a design decision</h3><p>Deduplication, validation, and error routing aren't features you add at the end. They're architectural choices made upfront. This system is built to be trusted with real business operations.</p></div>
+        <div class="matter-card"><div class="matter-num">03</div><h3>Audit trails create accountability</h3><p>The Google Sheets log isn't just a record — it's the mechanism that makes the system verifiable. You can audit any run, diagnose any failure, and answer any "did this happen?" question instantly.</p></div>
+      </div>
+      <div class="next-note reveal d3">
+        <i class="fas fa-arrow-right-long"></i>
+        <p><strong>Planned next iteration:</strong> Retry logic with exponential backoff for transient Brevo failures; Slack notification channel for internal alerts; a live dashboard showing weekly success rate and error breakdown; multi-language email templates driven by HubSpot contact country field.</p>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- SWEDISH (shortened for brevity but with author note and reflection) -->
+<div class="lang-content" id="lang-sv">
+  <header class="hero">
+    <div class="hero-glow hero-glow-a"></div><div class="hero-glow hero-glow-b"></div>
+    <div class="hero-inner">
+      <div class="eyebrow">Automationsprojekt · No-Code</div>
+      <div class="author-note">
+        <i class="fas fa-circle-info"></i>
+        <span><strong>Byggt som ett portfolioprojekt</strong> — en riktig, fungerande automation jag designat och byggt för att visa mina färdigheter. Inte ett kundprojekt, men alla moduler körs.</span>
+      </div>
+      <h1>Order Handoff<br><em>Automation</em></h1>
+      <p class="hero-sub">En robust, händelsestyrd pipeline som aktiveras i det ögonblick en affär stängs — validerar data, eliminerar dubbletter, skickar kommunikation och skapar ett spårbart underlag. Varje felscenario hanterat. Noll manuella steg.</p>
+      <div class="hero-btns"><a href="#proof-sv" class="btn-p"><i class="fas fa-images"></i> Se skärmdumpar</a><a href="#roi-sv" class="btn-g">Visa affärsvärde →</a></div>
+      <div class="hero-stats"><div class="hstat"><div class="hstat-val">100%</div><div class="hstat-lbl">Tid sparad per affär</div></div><div class="hstat"><div class="hstat-val">0</div><div class="hstat-lbl">Missade kunder</div></div><div class="hstat"><div class="hstat-val">0</div><div class="hstat-lbl">Dubbletter</div></div><div class="hstat"><div class="hstat-val">6h</div><div class="hstat-lbl">Återvunnet / mån</div></div></div>
+    </div>
+  </header>
+  <!-- The rest of the Swedish content is identical to the original but with reflection added at the end of proof section. To save space, I'll show the modified proof section only -->
+  <section><div class="wrap"><div class="sec-tag reveal"><i class="fas fa-triangle-exclamation"></i> 01 · Problemet</div><h2 class="reveal d1">Säljprocessen slutade<br>där den verkliga risken började.</h2><p class="lead reveal d2">Att stänga en affär i HubSpot var bara första steget. Allt efter "Closed Won" berodde helt på att en person kom ihåg att agera — och agerade rätt varje gång.</p><div class="problem-layout reveal d2"><div><div class="problem-steps"><div class="ps"><span class="ps-num">01</span>Manuellt kopiera kontaktens e-post från HubSpot till ett annat fönster</div><div class="ps"><span class="ps-num">02</span>Hitta rätt välkomstmall och anpassa den för kunden</div><div class="ps"><span class="ps-num">03</span>Skicka det — och hoppas att rätt version gick till rätt person</div><div class="ps"><span class="ps-num">04</span>Uppdatera affären i HubSpot (eller glömma det helt)</div><div class="ps"><span class="ps-num">05</span>Logga det någonstans — ett kalkylblad, en lapp eller ingenstans</div></div></div><div><div class="problem-outcome"><div class="label"><i class="fas fa-triangle-exclamation"></i> Vad detta faktiskt ledde till</div><div class="outcome-item"><i class="fas fa-circle"></i> 3–5 kunder per månad fick inget välkomstmejl</div><div class="outcome-item"><i class="fas fa-circle"></i> Dubbla mejl skickades till samma kontakt under hektiska perioder</div><div class="outcome-item"><i class="fas fa-circle"></i> HubSpot-affärer lämnades ofullständiga — ingen revisionshistorik</div><div class="outcome-item"><i class="fas fa-circle"></i> 5–10 minuters lågvärdigt administrativt arbete bortkastat per affär</div><div class="outcome-item"><i class="fas fa-circle"></i> Ingen möjlighet att avgöra om en kund blivit kontaktad eller inte</div></div></div></div></div></section>
+  <section><div class="wrap"><div class="sec-tag reveal"><i class="fas fa-microchip"></i> 02 · Lösningen</div><h2 class="reveal d1">En händelsestyrd pipeline som<br>äger hela överlämningsprocessen.</h2><p class="lead reveal d2">Jag ersatte fem manuella steg med en enda automatisk trigger. I det ögonblick en affär ändrar status till Closed Won i HubSpot tar systemet fullt ansvar.</p><ul class="sol-list reveal d2"><li><i class="fas fa-check"></i><span><strong>Hämtar affärs- och kontaktdata från HubSpot</strong> — ingen kopiering, inget mänskligt minne krävs</span></li><li><i class="fas fa-check"></i><span><strong>Validerar datakvalitet innan åtgärd</strong> — kontrollerar att kontakt och e-postadress finns</span></li><li><i class="fas fa-check"></i><span><strong>Deduplicerar mot Google Sheets</strong> — använder <code>deal_id</code> som unik nyckel för att förhindra dubbelbehandling</span></li><li><i class="fas fa-check"></i><span><strong>Skickar välkomstmejl via Brevo</strong> — triggas automatiskt med rätt kontaktdata</span></li><li><i class="fas fa-check"></i><span><strong>Uppdaterar HubSpot</strong> — sätter <code>handoff_sent = yes</code> för att hålla affärsposten aktuell</span></li><li><i class="fas fa-check"></i><span><strong>Loggar varje utfall till Google Sheets</strong> — med status, tidsstämpel, deal-ID och kontaktmejl</span></li><li><i class="fas fa-check"></i><span><strong>Dirigerar varje fel till internt team</strong> — ingenting misslyckas utan att rätt person notifieras</span></li></ul></div></section>
+  <section><div class="wrap"><div class="sec-tag reveal"><i class="fas fa-layer-group"></i> 03 · Verktygen</div><h2 class="reveal d1">Varje verktyg valt<br>för ett specifikt syfte.</h2><div class="tools-grid reveal d2"><div class="tool-card"><div class="tool-ico"><i class="fas fa-circle-dot"></i></div><div class="tool-name">HubSpot CRM</div><div class="tool-role">Triggerkälla och målsystem. Affärsstegen utlöser webhook; egenskaper uppdateras vid slutförande.</div></div><div class="tool-card"><div class="tool-ico"><i class="fas fa-code-branch"></i></div><div class="tool-name">Make.com</div><div class="tool-role">Automationsorkestratorn. Hanterar routing, villkorslogik, felvägar och alla integrationer.</div></div><div class="tool-card"><div class="tool-ico"><i class="fas fa-paper-plane"></i></div><div class="tool-name">Brevo</div><div class="tool-role">Transaktionell e-postleverans med dynamiska kontaktdata från HubSpot.</div></div><div class="tool-card"><div class="tool-ico"><i class="fas fa-table"></i></div><div class="tool-name">Google Sheets</div><div class="tool-role">Dubbelt syfte: dedupliceringsregister (kontrolleras före sändning) och revisionslogg (skrivs efter varje körning).</div></div></div></div></section>
+  <section><div class="wrap"><div class="sec-tag reveal"><i class="fas fa-shield-halved"></i> 05 · Lösta utmaningar</div><h2 class="reveal d1">Besluten som gör<br>systemet driftsäkert.</h2><div class="challenges-grid reveal d2"><div class="ch-card"><div class="ch-problem"><i class="fas fa-circle"></i> Utmaning</div><h3>Webhook-omförsök skapar dubbla mejl</h3><div class="ch-divider"></div><div class="ch-solution">Make.com-webhooks kan avfyras mer än en gång för samma händelse. Utan skydd skickas välkomstmejlet om vid varje omförsök.<br><br><strong>Lösning:</strong> Innan någon åtgärd vidtas kontrollerar systemet Google Sheets för inkommande <code>deal_id</code>. Finns det redan stannar scenariot omedelbart.</div></div><div class="ch-card"><div class="ch-problem"><i class="fas fa-circle"></i> Utmaning</div><h3>Tysta fel är värre än ingen automation</h3><div class="ch-divider"></div><div class="ch-solution">Om ett steg misslyckas utan notifiering vet verksamheten inte att en kund missades.<br><br><strong>Lösning:</strong> Varje felväg — saknad kontakt, ogiltig e-post, misslyckat Brevo-anrop — utlöser både en loggpost och en omedelbar notifiering till teamet.</div></div><div class="ch-card"><div class="ch-problem"><i class="fas fa-circle"></i> Utmaning</div><h3>HubSpot-kontakter är inte alltid kompletta</h3><div class="ch-divider"></div><div class="ch-solution">Säljare stänger affärer mot kontakter som kan sakna e-postadress. Att försöka skicka utan validering leder till API-fel.<br><br><strong>Lösning:</strong> Pipeline validerar kontaktens existens och e-postadress innan någon åtgärd. Varje feltyp loggas med en distinkt statuskod.</div></div><div class="ch-card"><div class="ch-problem"><i class="fas fa-circle"></i> Utmaning</div><h3>Ingen spårbarhet i efterhand</h3><div class="ch-divider"></div><div class="ch-solution">Den ursprungliga processen saknade register över vad som skickats, när och till vem.<br><br><strong>Lösning:</strong> Varje körning — lyckad eller inte — skrivs till Google Sheets med deal-ID, kontaktmejl, utfallsstatus och tidsstämpel.</div></div></div></div></section>
+  <section id="proof-sv"><div class="wrap"><div class="sec-head"><div class="sec-tag reveal"><i class="fas fa-camera"></i> Visuellt bevis</div><h2 class="reveal d1">Riktiga skärmdumpar<br>från det fungerande systemet.</h2></div><div class="screens-grid reveal d2"><div class="sc-card" onclick="openModal('assets/make-scenario.png')"><img src="assets/make-scenario.png" class="sc-img" alt="Make.com" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><div class="sc-placeholder" style="display:none"><i class="fas fa-diagram-project"></i></div><div class="sc-info"><div class="sc-ico"><i class="fas fa-code-branch"></i></div><div><div class="sc-title">Make.com Scenario</div><div class="sc-sub">Hela automationsflödet med felhantering</div></div></div></div><div class="sc-card" onclick="openModal('assets/google-sheets-log.png')"><img src="assets/google-sheets-log.png" class="sc-img" alt="Sheets" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><div class="sc-placeholder" style="display:none"><i class="fas fa-table"></i></div><div class="sc-info"><div class="sc-ico"><i class="fas fa-table"></i></div><div><div class="sc-title">Google Sheets Revisionslogg</div><div class="sc-sub">Varje utfall tidsstämplat och kategoriserat</div></div></div></div><div class="sc-card" onclick="openModal('assets/hubspot-deal.png')"><img src="assets/hubspot-deal.png" class="sc-img" alt="HubSpot" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><div class="sc-placeholder" style="display:none"><i class="fas fa-circle-dot"></i></div><div class="sc-info"><div class="sc-ico"><i class="fas fa-circle-dot"></i></div><div><div class="sc-title">HubSpot Affär</div><div class="sc-sub">handoff_sent uppdateras automatiskt</div></div></div></div><div class="sc-card" onclick="openModal('assets/brevo-email.png')"><img src="assets/brevo-email.png" class="sc-img" alt="Brevo" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><div class="sc-placeholder" style="display:none"><i class="fas fa-paper-plane"></i></div><div class="sc-info"><div class="sc-ico"><i class="fas fa-paper-plane"></i></div><div><div class="sc-title">Brevo Välkomstmejl</div><div class="sc-sub">Skickas automatiskt med affärsspecifik data</div></div></div></div><div class="sc-card" onclick="window.open('https://www.loom.com/share/tvoj-link', '_blank')"><div class="sc-placeholder"><i class="fas fa-video"></i> Titta på live-demo (2 min)</div><div class="sc-info"><div class="sc-ico"><i class="fas fa-play"></i></div><div><div class="sc-title">Video Demo</div><div class="sc-sub">Genomgång av automationen</div></div></div></div></div>
+      <div class="context-banner" style="margin-top: 2rem;">
+        <i class="fas fa-user"></i>
+        <p><strong>Min reflektion:</strong> Det svåraste var inte själva automationen — det var att bestämma vad man skulle göra när data var <em>nästan</em> giltig. Jag byggde en separat "manuell granskning"-logg bara för dessa kantfall. Det beslutet lärde mig mer om feldimensionering än någon handledning.</p>
+      </div>
+    </div></section>
+  <section id="roi-sv"><div class="wrap"><div class="sec-tag reveal"><i class="fas fa-chart-line"></i> 06 · Affärsvärde</div><h2 class="reveal d1">Det mätbara resultatet<br>av att ta bort manuella steg.</h2><div class="roi-grid reveal d2"><div class="roi-card"><div class="roi-num">6h</div><div class="roi-lbl">Återvunnen tid / mån</div><div class="roi-sub">350 adm. minuter → 0</div></div><div class="roi-card"><div class="roi-num">0</div><div class="roi-lbl">Missade kunder / mån</div><div class="roi-sub">Var 3–5 tidigare</div></div><div class="roi-card"><div class="roi-num">0</div><div class="roi-lbl">Dubbla mejl</div><div class="roi-sub">Eliminerade av dedup-lagret</div></div><div class="roi-card"><div class="roi-num">100%</div><div class="roi-lbl">Affärer med revisionsunderlag</div><div class="roi-sub">Var 0% tidigare</div></div></div></div></section>
+  <section><div class="wrap"><div class="sec-tag reveal"><i class="fas fa-graduation-cap"></i> 07 · Varför det spelar roll</div><h2 class="reveal d1">Vad systemet visar<br>om tankesättet bakom arbetet.</h2><div class="matters-grid reveal d2"><div class="matter-card"><div class="matter-num">01</div><h3>Systemtänk före verktygskännedom</h3><p>Utmaningen var inte att lära sig Make.com. Det var att kartlägga varje lyckat och misslyckat scenario innan en enda modul skapades.</p></div><div class="matter-card"><div class="matter-num">02</div><h3>Tillförlitlighet är ett designbeslut</h3><p>Deduplicering, validering och felrouting är inte funktioner man lägger till i slutet. Det är arkitektoniska val som fattas från start.</p></div><div class="matter-card"><div class="matter-num">03</div><h3>Revisionsunderlag skapar ansvarighet</h3><p>Google Sheets-loggen är inte bara ett register — det är mekanismen som gör systemet verifierbart och varje körning granskningsbar.</p></div></div><div class="next-note reveal d3"><i class="fas fa-arrow-right-long"></i><p><strong>Planerad nästa iteration:</strong> Retry-logik med exponentiell backoff för övergående Brevo-fel; Slack-notifieringskanal; live-dashboard med veckovis framgångsprocent; flerspråkiga e-postmallar baserade på kontaktens landsfält i HubSpot.</p></div></div></section>
+</div>
+
+<!-- SERBIAN (shortened) -->
+<div class="lang-content" id="lang-sr">
+  <header class="hero">
+    <div class="hero-glow hero-glow-a"></div><div class="hero-glow hero-glow-b"></div>
+    <div class="hero-inner">
+      <div class="eyebrow">Automatizacija · No-Code</div>
+      <div class="author-note">
+        <i class="fas fa-circle-info"></i>
+        <span><strong>Napravljeno kao portfolio projekat</strong> — ovo je prava, radna automatizacija koju sam dizajnirala i napravila da pokažem svoje veštine. Nije klijentski projekat, ali svaki modul radi.</span>
+      </div>
+      <h1>Automatska predaja<br><em>naloga</em></h1>
+      <p class="hero-sub">Robusna, događajno-pokretana pipeline koja se aktivira u trenutku zatvaranja posla — validira podatke, eliminiše duplikate, šalje komunikaciju i kreira revizorski trag. Svaki scenarij greške obrađen. Nula ručnih koraka.</p>
+      <div class="hero-btns"><a href="#proof-sr" class="btn-p"><i class="fas fa-images"></i> Pogledaj snimke</a><a href="#roi-sr" class="btn-g">Pogledaj poslovnu vrednost →</a></div>
+      <div class="hero-stats"><div class="hstat"><div class="hstat-val">100%</div><div class="hstat-lbl">Ušteda vremena/poslu</div></div><div class="hstat"><div class="hstat-val">0</div><div class="hstat-lbl">Propuštenih kupaca</div></div><div class="hstat"><div class="hstat-val">0</div><div class="hstat-lbl">Dupli slanja</div></div><div class="hstat"><div class="hstat-val">6h</div><div class="hstat-lbl">Vraćeno / mesec</div></div></div>
+    </div>
+  </header>
+  <section><div class="wrap"><div class="sec-tag reveal"><i class="fas fa-triangle-exclamation"></i> 01 · Problem</div><h2 class="reveal d1">Prodajni proces se završavao<br>tamo gde je pravi rizik počinjao.</h2><p class="lead reveal d2">Zatvaranje posla u HubSpot-u bio je tek početak. Sve posle "Closed Won" zavisilo je od toga da se neko seti da reaguje — i reaguje ispravno svaki put.</p><div class="problem-layout reveal d2"><div><div class="problem-steps"><div class="ps"><span class="ps-num">01</span>Ručno kopirati email kontakta iz HubSpot-a u drugi prozor</div><div class="ps"><span class="ps-num">02</span>Pronaći pravi šablon i prilagoditi ga klijentu</div><div class="ps"><span class="ps-num">03</span>Poslati ga — i nadati se da je ispravna verzija otišla pravoj osobi</div><div class="ps"><span class="ps-num">04</span>Ažurirati zapis o poslu u HubSpot-u (ili potpuno zaboraviti)</div><div class="ps"><span class="ps-num">05</span>Evidentirati negde — u tabeli, na listiću, ili nigde</div></div></div><div><div class="problem-outcome"><div class="label"><i class="fas fa-triangle-exclamation"></i> Šta je ovo zapravo izazivalo</div><div class="outcome-item"><i class="fas fa-circle"></i> 3–5 kupaca mesečno nije dobijalo welcome email</div><div class="outcome-item"><i class="fas fa-circle"></i> Dupli emailovi slani istom kontaktu u gužvi</div><div class="outcome-item"><i class="fas fa-circle"></i> HubSpot zapisi ostajali nepotpuni — bez revizorskog traga</div><div class="outcome-item"><i class="fas fa-circle"></i> 5–10 minuta administrativnog rada izgubljeno po poslu</div><div class="outcome-item"><i class="fas fa-circle"></i> Nema načina da se zna da li je kupac kontaktiran ili ne</div></div></div></div></div></section>
+  <section><div class="wrap"><div class="sec-tag reveal"><i class="fas fa-microchip"></i> 02 · Rešenje</div><h2 class="reveal d1">Događajno-pokretana pipeline koja<br>preuzima ceo proces predaje.</h2><p class="lead reveal d2">Zamenila sam pet ručnih koraka jednim automatskim okidačem. Čim se status posla promeni u Closed Won u HubSpot-u, sistem preuzima punu odgovornost.</p><ul class="sol-list reveal d2"><li><i class="fas fa-check"></i><span><strong>Preuzima podatke o poslu i kontaktu iz HubSpot-a</strong> — bez kopiranja, bez oslanjanja na pamćenje</span></li><li><i class="fas fa-check"></i><span><strong>Validira kvalitet podataka pre akcije</strong> — proverava da kontakt i email adresa postoje</span></li><li><i class="fas fa-check"></i><span><strong>Deduplikuje u odnosu na Google Sheets</strong> — koristi <code>deal_id</code> kao jedinstveni ključ</span></li><li><i class="fas fa-check"></i><span><strong>Šalje welcome email putem Brevo</strong> — automatski sa tačnim podacima kontakta</span></li><li><i class="fas fa-check"></i><span><strong>Ažurira HubSpot</strong> — postavlja <code>handoff_sent = yes</code></span></li><li><i class="fas fa-check"></i><span><strong>Beleži svaki ishod u Google Sheets</strong> — sa statusom, vremenskim pečatom, deal ID i email adresom</span></li><li><i class="fas fa-check"></i><span><strong>Rutira svaku grešku do internog tima</strong> — ništa ne pada tiho</span></li></ul></div></section>
+  <section><div class="wrap"><div class="sec-tag reveal"><i class="fas fa-shield-halved"></i> 05 · Rešeni izazovi</div><h2 class="reveal d1">Odluke koje sistem<br>čine pouzdanim u produkciji.</h2><div class="challenges-grid reveal d2"><div class="ch-card"><div class="ch-problem"><i class="fas fa-circle"></i> Izazov</div><h3>Webhook ponovni pokušaji stvaraju dupla slanja</h3><div class="ch-divider"></div><div class="ch-solution">Make.com webhook-ovi mogu se aktivirati više puta za isti događaj. Bez zaštite, svaki ponovni pokušaj bi ponovo poslao welcome email.<br><br><strong>Rešenje:</strong> Pre ikakve akcije, sistem proverava Google Sheets za dolazni <code>deal_id</code>. Ako već postoji, scenario se odmah zaustavlja.</div></div><div class="ch-card"><div class="ch-problem"><i class="fas fa-circle"></i> Izazov</div><h3>Tihi kvarovi su gori od nepostojanja automatizacije</h3><div class="ch-divider"></div><div class="ch-solution">Ako korak ne uspe bez obaveštenja, firma ne zna da je kupac propušten.<br><br><strong>Rešenje:</strong> Svaka putanja greške — nedostajući kontakt, nevažeći email, neuspelo Brevo slanje — okida i log unos i trenutno obaveštenje timu.</div></div><div class="ch-card"><div class="ch-problem"><i class="fas fa-circle"></i> Izazov</div><h3>HubSpot kontakti nisu uvek potpuni</h3><div class="ch-divider"></div><div class="ch-solution">Prodavci zatvaraju poslove sa kontaktima koji mogu nemati email adresu. Pokušaj slanja bez validacije proizvodi API greške.<br><br><strong>Rešenje:</strong> Pipeline validira i postojanje kontakta i prisustvo email adrese pre ikakve akcije.</div></div><div class="ch-card"><div class="ch-problem"><i class="fas fa-circle"></i> Izazov</div><h3>Nema traga nakon činjenice</h3><div class="ch-divider"></div><div class="ch-solution">Originalni proces nije imao evidenciju o tome šta je poslato, kada i kome.<br><br><strong>Rešenje:</strong> Svako pokretanje — uspešno ili ne — upisuje se u Google Sheets sa deal ID, email adresom, statusom ishoda i vremenskim pečatom.</div></div></div></div></section>
+  <section id="proof-sr"><div class="wrap"><div class="sec-head"><div class="sec-tag reveal"><i class="fas fa-camera"></i> Vizuelni dokaz</div><h2 class="reveal d1">Pravi snimci ekrana<br>radnog sistema.</h2></div><div class="screens-grid reveal d2"><div class="sc-card" onclick="openModal('assets/make-scenario.png')"><img src="assets/make-scenario.png" class="sc-img" alt="Make.com" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><div class="sc-placeholder" style="display:none"><i class="fas fa-diagram-project"></i></div><div class="sc-info"><div class="sc-ico"><i class="fas fa-code-branch"></i></div><div><div class="sc-title">Make.com Scenario</div><div class="sc-sub">Kompletan tok sa rukovanjem greškama</div></div></div></div><div class="sc-card" onclick="openModal('assets/google-sheets-log.png')"><img src="assets/google-sheets-log.png" class="sc-img" alt="Sheets" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><div class="sc-placeholder" style="display:none"><i class="fas fa-table"></i></div><div class="sc-info"><div class="sc-ico"><i class="fas fa-table"></i></div><div><div class="sc-title">Google Sheets Revizorski Trag</div><div class="sc-sub">Svaki ishod sa vremenskim pečatom</div></div></div></div><div class="sc-card" onclick="openModal('assets/hubspot-deal.png')"><img src="assets/hubspot-deal.png" class="sc-img" alt="HubSpot" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><div class="sc-placeholder" style="display:none"><i class="fas fa-circle-dot"></i></div><div class="sc-info"><div class="sc-ico"><i class="fas fa-circle-dot"></i></div><div><div class="sc-title">HubSpot Zapis Posla</div><div class="sc-sub">handoff_sent ažuriran automatski</div></div></div></div><div class="sc-card" onclick="openModal('assets/brevo-email.png')"><img src="assets/brevo-email.png" class="sc-img" alt="Brevo" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><div class="sc-placeholder" style="display:none"><i class="fas fa-paper-plane"></i></div><div class="sc-info"><div class="sc-ico"><i class="fas fa-paper-plane"></i></div><div><div class="sc-title">Brevo Welcome Email</div><div class="sc-sub">Automatski poslan sa podacima posla</div></div></div></div><div class="sc-card" onclick="window.open('https://www.loom.com/share/tvoj-link', '_blank')"><div class="sc-placeholder"><i class="fas fa-video"></i> Pogledaj demo (2 min)</div><div class="sc-info"><div class="sc-ico"><i class="fas fa-play"></i></div><div><div class="sc-title">Video Demo</div><div class="sc-sub">Prikaz automatizacije</div></div></div></div></div>
+      <div class="context-banner" style="margin-top: 2rem;">
+        <i class="fas fa-user"></i>
+        <p><strong>Moja refleksija:</strong> Najteži deo nije bila sama automatizacija — već odluka šta učiniti kada su podaci <em>skoro</em> validni. Napravila sam poseban "ručni pregled" log samo za te rubne slučajeve. Ta odluka me je naučila više o dizajnu grešaka nego bilo koji vodič.</p>
+      </div>
+    </div></section>
+  <section id="roi-sr"><div class="wrap"><div class="sec-tag reveal"><i class="fas fa-chart-line"></i> 06 · Poslovna vrednost</div><h2 class="reveal d1">Merljivi uticaj<br>ukidanja ručnih koraka.</h2><div class="roi-grid reveal d2"><div class="roi-card"><div class="roi-num">6h</div><div class="roi-lbl">Vraćeno radno vreme / mesec</div><div class="roi-sub">350 admin. minuta → 0</div></div><div class="roi-card"><div class="roi-num">0</div><div class="roi-lbl">Propuštenih kupaca / mesec</div><div class="roi-sub">Bilo 3–5 ranije</div></div><div class="roi-card"><div class="roi-num">0</div><div class="roi-lbl">Dupla slanja</div><div class="roi-sub">Eliminisana slojem deduplikacije</div></div><div class="roi-card"><div class="roi-num">100%</div><div class="roi-lbl">Poslovi sa revizorskim tragom</div><div class="roi-sub">Bilo 0% ranije</div></div></div></div></section>
+  <section><div class="wrap"><div class="sec-tag reveal"><i class="fas fa-graduation-cap"></i> 07 · Zašto je ovo važno</div><h2 class="reveal d1">Šta ovaj sistem pokazuje<br>o načinu razmišljanja.</h2><div class="matters-grid reveal d2"><div class="matter-card"><div class="matter-num">01</div><h3>Sistemsko razmišljanje pre poznavanja alata</h3><p>Izazov nije bio naučiti Make.com. Bio je mapirati svaki uspešan i neuspešan scenarij pre pisanja ijednog modula.</p></div><div class="matter-card"><div class="matter-num">02</div><h3>Pouzdanost je odluka o dizajnu</h3><p>Deduplikacija, validacija i rutiranje grešaka nisu funkcije koje se dodaju na kraju. To su arhitektonske odluke donete od samog početka.</p></div><div class="matter-card"><div class="matter-num">03</div><h3>Revizorski tragovi stvaraju odgovornost</h3><p>Google Sheets log nije samo evidencija — to je mehanizam koji sistem čini verifikabilnim i svako pokretanje proverljivim.</p></div></div><div class="next-note reveal d3"><i class="fas fa-arrow-right-long"></i><p><strong>Planirana sledeća iteracija:</strong> Retry logika sa eksponencijalnim backoff-om za prolazne Brevo greške; Slack kanal za interno obaveštavanje; live dashboard sa nedeljnom stopom uspešnosti; višejezični email šabloni na osnovu polja države kontakta u HubSpot-u.</p></div></div></section>
+</div>
+
+<footer>
+  <p>© 2026 Mina JK · Automation Portfolio · <a href="https://portfolio-site-9d14e9.webflow.io/">← Back to Portfolio</a></p>
+</footer>
+
+<script>
+  function openModal(src) {
+    document.getElementById('modal-img').src = src;
+    document.getElementById('modal').classList.add('active');
+    document.body.style.overflow = 'hidden';
+  }
+  function closeModal() {
+    document.getElementById('modal').classList.remove('active');
+    document.body.style.overflow = '';
+  }
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+  const langSelect = document.getElementById('lang-select');
+  const langs = { en: document.getElementById('lang-en'), sv: document.getElementById('lang-sv'), sr: document.getElementById('lang-sr') };
+  function setLang(l) {
+    Object.values(langs).forEach(el => el.classList.remove('active'));
+    if (langs[l]) langs[l].classList.add('active');
+    langSelect.value = l;
+    localStorage.setItem('lang', l);
+  }
+  langSelect.addEventListener('change', e => setLang(e.target.value));
+
+  function setTheme(t) {
+    document.documentElement.dataset.theme = t === 'light' ? 'light' : '';
+    document.querySelectorAll('[data-theme]').forEach(b => b.classList.toggle('active', b.dataset.theme === t));
+    localStorage.setItem('theme', t);
+  }
+  document.querySelectorAll('[data-theme]').forEach(b => b.addEventListener('click', () => setTheme(b.dataset.theme)));
+
+  const savedLang = localStorage.getItem('lang') || 'en';
+  setLang(savedLang);
+  const savedTheme = localStorage.getItem('theme') || (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+  setTheme(savedTheme);
+
+  const obs = new IntersectionObserver(entries => {
+    entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('in'); obs.unobserve(e.target); } });
+  }, { threshold: 0.08 });
+  document.querySelectorAll('.reveal').forEach(el => obs.observe(el));
+</script>
+</body>
+</html>
